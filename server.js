@@ -6,23 +6,26 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ================= USERS (simple demo system) =================
-const users = {
-    admin: "1234",
-    test: "1234"
-};
+// ================= DATA =================
+let users = {}; // { username: password }
+let files = []; // uploaded files
 
+// ================= HELPERS =================
 function getUser(req) {
     const cookie = req.headers.cookie || "";
     const match = cookie.match(/user=([^;]+)/);
     return match ? match[1] : null;
 }
 
+function isLoggedIn(req) {
+    return !!getUser(req);
+}
+
 function isAdmin(req) {
     return getUser(req) === "admin";
 }
 
-// ================= PARSING =================
+// ================= MIDDLEWARE =================
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
@@ -39,10 +42,35 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// ================= DATA =================
-let files = [];
-
 app.use('/uploads', express.static('uploads'));
+
+// ================= SIGN UP PAGE =================
+app.get('/signup', (req, res) => {
+    res.send(`
+<h2>Sign Up</h2>
+
+<form method="POST" action="/signup">
+<input name="user" placeholder="username" required><br>
+<input name="pass" type="password" placeholder="password" required><br>
+<button>Create Account</button>
+</form>
+
+<p><a href="/login">Already have an account? Login</a></p>
+    `);
+});
+
+// SIGN UP ACTION
+app.post('/signup', (req, res) => {
+    const { user, pass } = req.body;
+
+    if (!user || !pass) return res.send("Missing fields");
+    if (users[user]) return res.send("User already exists");
+
+    users[user] = pass;
+
+    res.setHeader('Set-Cookie', 'user=' + user + '; Path=/');
+    res.redirect('/');
+});
 
 // ================= LOGIN =================
 app.get('/login', (req, res) => {
@@ -54,6 +82,8 @@ app.get('/login', (req, res) => {
 <input name="pass" type="password" placeholder="password" required><br>
 <button>Login</button>
 </form>
+
+<p><a href="/signup">Create account</a></p>
     `);
 });
 
@@ -83,7 +113,10 @@ app.get('/', (req, res) => {
     res.send(`
 <h2>OpenShare</h2>
 
-<p>Logged in as: <b>${user}</b> | <a href="/logout">Logout</a></p>
+<p>
+Logged in as: <b>${user}</b> |
+<a href="/logout">Logout</a>
+</p>
 
 <form id="uploadForm">
 Title: <input name="title" required />
@@ -145,12 +178,12 @@ app.post('/upload', upload.single('file'), (req, res) => {
     res.sendStatus(200);
 });
 
-// ================= FILE LIST =================
+// ================= FILES =================
 app.get('/files', (req, res) => {
     res.json(files);
 });
 
-// ================= DELETE (ADMIN ONLY) =================
+// ================= ADMIN DELETE =================
 app.delete('/delete/:id', (req, res) => {
     if (!isAdmin(req)) return res.sendStatus(403);
 
