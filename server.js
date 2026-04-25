@@ -14,7 +14,7 @@ function isAdmin(req) {
     return req.headers.cookie && req.headers.cookie.includes("auth=1");
 }
 
-// ================= BODY PARSER =================
+// ================= PARSER =================
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
@@ -35,18 +35,77 @@ let files = [];
 
 app.use('/uploads', express.static('uploads'));
 
-// ================= HOME PAGE =================
+// ================= GLOBAL STYLE =================
+const style = `
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #f4f4f4;
+    margin: 0;
+    padding: 0;
+    color: #111;
+}
+
+.container {
+    width: 85%;
+    margin: auto;
+    background: white;
+    padding: 20px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+h2 {
+    border-bottom: 2px solid #ddd;
+    padding-bottom: 5px;
+}
+
+a {
+    color: #0645ad;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+input, button {
+    padding: 6px;
+    margin: 4px 0;
+}
+
+button {
+    cursor: pointer;
+    background: #333;
+    color: white;
+    border: none;
+}
+
+button:hover {
+    background: #555;
+}
+
+.card {
+    border: 1px solid #ddd;
+    padding: 10px;
+    margin-bottom: 10px;
+    background: #fafafa;
+}
+
+.small {
+    font-size: 12px;
+    color: #666;
+}
+</style>
+`;
+
+// ================= HOME =================
 app.get('/', (req, res) => {
     res.send(`
 <!DOCTYPE html>
 <html>
 <head>
 <title>OpenShare</title>
-<style>
-body { font-family: Verdana; background:white; font-size:13px; }
-.container { width:80%; margin:auto; }
-a { color:blue; }
-</style>
+${style}
 </head>
 <body>
 
@@ -75,8 +134,9 @@ async function load() {
 
     document.getElementById('list').innerHTML =
         data.map(f => \`
-            <div>
-                <a href="\${f.url}" target="_blank">\${f.title}</a>
+            <div class="card">
+                <a href="\${f.url}" target="_blank">\${f.title}</a><br>
+                <span class="small">\${f.time || ""}</span>
             </div>
         \`).join('');
 }
@@ -105,13 +165,28 @@ load();
 // ================= LOGIN =================
 app.get('/login', (req, res) => {
     res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+<title>Login</title>
+${style}
+</head>
+<body>
+
+<div class="container">
+
 <h2>Admin Login</h2>
 
 <form method="POST" action="/login">
-<input name="user" placeholder="username" required><br><br>
-<input name="pass" type="password" placeholder="password" required><br><br>
+<input name="user" placeholder="username" required><br>
+<input name="pass" type="password" placeholder="password" required><br>
 <button>Login</button>
 </form>
+
+</div>
+
+</body>
+</html>
     `);
 });
 
@@ -132,7 +207,7 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
 });
 
-// ================= ADMIN PANEL =================
+// ================= ADMIN =================
 app.get('/admin', (req, res) => {
     if (!isAdmin(req)) return res.redirect('/login');
 
@@ -141,12 +216,7 @@ app.get('/admin', (req, res) => {
 <html>
 <head>
 <title>Admin Panel</title>
-<style>
-body { font-family: Verdana; background:white; font-size:13px; }
-.container { width:80%; margin:auto; }
-.card { border:1px solid #ccc; padding:10px; margin-bottom:10px; }
-button { margin:2px; }
-</style>
+${style}
 </head>
 <body>
 
@@ -189,7 +259,7 @@ async function load() {
             <div class="card">
                 <b>\${f.title}</b><br>
                 <a href="\${f.url}" target="_blank">Open</a><br>
-                <small>\${f.size || "unknown"} bytes</small><br>
+                <span class="small">\${f.time || ""}</span><br>
                 <button onclick="del(\${i})">Delete</button>
             </div>
         \`).join('');
@@ -228,7 +298,6 @@ app.post('/upload', upload.single('file'), (req, res) => {
         title: req.body.title,
         url: '/uploads/' + req.file.filename,
         file: req.file.filename,
-        size: req.file.size,
         time: new Date().toLocaleString()
     });
 
