@@ -17,7 +17,7 @@ function isAdmin(req) {
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// ================= STORAGE =================
+// ================= FILE STORAGE =================
 if (!fs.existsSync('uploads')) {
     fs.mkdirSync('uploads');
 }
@@ -34,86 +34,99 @@ let files = [];
 
 app.use('/uploads', express.static('uploads'));
 
-// ================= RETRO STYLE =================
+// ================= WOW STYLE =================
 const style = `
 <style>
 body {
-    font-family: "Courier New", monospace;
-    background: #eaeaea;
     margin: 0;
-    color: #111;
+    font-family: Georgia, serif;
+    background: url('https://i.imgur.com/3ZQ3Z9m.jpg');
+    background-size: cover;
+    color: #f5deb3;
 }
 
-.topbar {
-    background: #111;
-    color: white;
-    padding: 10px;
-    font-weight: bold;
-}
-
+/* MAIN WINDOW FRAME */
 .container {
-    width: 90%;
-    max-width: 1000px;
-    margin: 20px auto;
-    background: white;
-    padding: 15px;
-    border: 2px solid #ccc;
+    width: 85%;
+    margin: 30px auto;
+    padding: 20px;
+    background: rgba(10, 10, 10, 0.85);
+    border: 3px solid #c9a227;
+    box-shadow: 0 0 25px rgba(0,0,0,0.8);
 }
 
+/* TITLE BAR */
+.topbar {
+    background: linear-gradient(#3b2a1a, #1a120b);
+    color: #ffd700;
+    padding: 12px;
+    font-size: 20px;
+    font-weight: bold;
+    border-bottom: 2px solid #c9a227;
+    text-shadow: 0 0 5px black;
+}
+
+/* LINKS */
 a {
-    color: #0000cc;
+    color: #ffd700;
     text-decoration: none;
 }
 
 a:hover {
-    text-decoration: underline;
+    color: #fff2a8;
+    text-shadow: 0 0 5px gold;
 }
 
+/* INPUTS */
 input, button {
-    padding: 5px;
-    margin: 4px 0;
-    font-family: monospace;
+    font-family: Georgia, serif;
+    padding: 6px;
+    margin: 5px 0;
+    background: #1a1a1a;
+    border: 1px solid #c9a227;
+    color: #f5deb3;
 }
 
 button {
-    background: #222;
-    color: white;
-    border: none;
     cursor: pointer;
+    background: linear-gradient(#3b2a1a, #1a120b);
 }
 
 button:hover {
-    background: #444;
+    background: #4a351f;
 }
 
-/* TABLE STYLE */
+/* WOW TABLE */
 table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 10px;
+    background: rgba(0,0,0,0.4);
 }
 
 th {
-    background: #ddd;
-    padding: 8px;
-    text-align: left;
-    border-bottom: 2px solid #aaa;
+    background: #2a1d12;
+    color: #ffd700;
+    padding: 10px;
+    border-bottom: 2px solid #c9a227;
 }
 
 td {
-    padding: 8px;
-    border-bottom: 1px solid #ccc;
+    padding: 10px;
+    border-bottom: 1px solid #3a2a1a;
 }
 
 tr:hover {
-    background: #f5f5f5;
+    background: rgba(201, 162, 39, 0.1);
 }
 
+/* SMALL TEXT */
 .small {
     font-size: 11px;
-    color: #666;
+    color: #c0b283;
 }
 
+/* PANEL BUTTON BAR */
 .nav {
     margin-bottom: 10px;
 }
@@ -131,25 +144,25 @@ ${style}
 </head>
 <body>
 
-<div class="topbar">OpenShare Index</div>
+<div class="topbar">OpenShare - Azeroth Archive</div>
 
 <div class="container">
 
 <div class="nav">
-<a href="/login">Admin Login</a>
+<a href="/login">Enter Admin Portal</a>
 </div>
 
 <form id="uploadForm">
 Title: <input name="title" required />
 <input type="file" name="file" required />
-<button>Upload</button>
+<button>Upload Relic</button>
 </form>
 
 <hr>
 
 <table>
 <tr>
-<th>Name</th>
+<th>Item</th>
 <th>Action</th>
 <th>Time</th>
 </tr>
@@ -168,7 +181,7 @@ async function load() {
         data.map(f => \`
             <tr>
                 <td>\${f.title}</td>
-                <td><a href="\${f.url}" target="_blank">Download</a></td>
+                <td><a href="\${f.url}" target="_blank">View</a></td>
                 <td class="small">\${f.time || ""}</td>
             </tr>
         \`).join('');
@@ -206,14 +219,14 @@ ${style}
 </head>
 <body>
 
-<div class="topbar">Admin Login</div>
+<div class="topbar">Sanctum Access</div>
 
 <div class="container">
 
 <form method="POST" action="/login">
 <input name="user" placeholder="username" required><br>
 <input name="pass" type="password" placeholder="password" required><br>
-<button>Login</button>
+<button>Enter Portal</button>
 </form>
 
 </div>
@@ -231,7 +244,7 @@ app.post('/login', (req, res) => {
         return res.redirect('/admin');
     }
 
-    res.send("Wrong login");
+    res.send("Access Denied");
 });
 
 // ================= LOGOUT =================
@@ -248,30 +261,30 @@ app.get('/admin', (req, res) => {
 <!DOCTYPE html>
 <html>
 <head>
-<title>Admin Panel</title>
+<title>Admin</title>
 ${style}
 </head>
 <body>
 
-<div class="topbar">Admin Panel</div>
+<div class="topbar">Admin Sanctum</div>
 
 <div class="container">
 
 <div class="nav">
 <button onclick="load()">Refresh</button>
-<button onclick="deleteAll()">Delete All</button>
+<button onclick="deleteAll()">Purge All</button>
 <a href="/logout">Logout</a>
 </div>
 
-<input id="search" placeholder="Search files..." onkeyup="load()">
+<input id="search" placeholder="Search relics..." onkeyup="load()">
 
 <div id="stats"></div>
 
 <table>
 <tr>
 <th>Name</th>
-<th>Link</th>
 <th>Action</th>
+<th>Delete</th>
 </tr>
 
 <tbody id="adminList"></tbody>
@@ -292,14 +305,14 @@ async function load() {
     );
 
     document.getElementById('stats').innerHTML =
-        "<b>Total files:</b> " + data.length;
+        "Relics stored: " + data.length;
 
     document.getElementById('adminList').innerHTML =
         filtered.map((f,i) => \`
             <tr>
                 <td>\${f.title}</td>
                 <td><a href="\${f.url}" target="_blank">Open</a></td>
-                <td><button onclick="del(\${i})">Delete</button></td>
+                <td><button onclick="del(\${i})">Destroy</button></td>
             </tr>
         \`).join('');
 }
@@ -343,7 +356,7 @@ app.post('/upload', upload.single('file'), (req, res) => {
     res.sendStatus(200);
 });
 
-// ================= FILES =================
+// ================= FILE LIST =================
 app.get('/files', (req, res) => {
     res.json(files);
 });
