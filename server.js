@@ -7,8 +7,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ================= DATA =================
-let users = {}; // username -> password
+let users = {}; 
 let files = [];
+let posts = []; // forums
 
 // ================= HELPERS =================
 function getUser(req) {
@@ -25,7 +26,7 @@ function isAdmin(req) {
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// ================= FILE STORAGE =================
+// ================= FILES =================
 if (!fs.existsSync('uploads')) {
     fs.mkdirSync('uploads');
 }
@@ -57,7 +58,6 @@ body {
     padding: 20px;
     background: rgba(10,10,10,0.85);
     border: 3px solid #c9a227;
-    box-shadow: 0 0 25px rgba(0,0,0,0.8);
 }
 
 .topbar {
@@ -78,8 +78,8 @@ a:hover {
     text-shadow: 0 0 5px gold;
 }
 
-input, button {
-    font-family: Georgia, serif;
+input, button, textarea {
+    font-family: Georgia;
     padding: 6px;
     margin: 5px 0;
     background: #1a1a1a;
@@ -89,17 +89,11 @@ input, button {
 
 button {
     cursor: pointer;
-    background: linear-gradient(#3b2a1a, #1a120b);
-}
-
-button:hover {
-    background: #4a351f;
 }
 
 table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 10px;
 }
 
 th {
@@ -113,13 +107,11 @@ td {
     border-bottom: 1px solid #3a2a1a;
 }
 
-tr:hover {
-    background: rgba(201,162,39,0.1);
-}
-
-.small {
-    font-size: 11px;
-    color: #c0b283;
+.card {
+    border: 1px solid #c9a227;
+    padding: 10px;
+    margin: 10px 0;
+    background: rgba(0,0,0,0.4);
 }
 </style>
 `;
@@ -127,43 +119,32 @@ tr:hover {
 // ================= SIGNUP =================
 app.get('/signup', (req, res) => {
     res.send(`
-<!DOCTYPE html>
-<html>
-<head><title>Sign Up</title>${style}</head>
+<html><head><title>Signup</title>${style}</head>
 <body>
-
 <div class="topbar">Create Account</div>
-
 <div class="container">
-
-<h2>Sign Up</h2>
 
 <form method="POST" action="/signup">
 <input name="user" placeholder="username" required><br>
-<input name="pass" type="password" placeholder="password" required><br>
-<button>Create Account</button>
+<input name="pass" type="password" required><br>
+<button>Create</button>
 </form>
 
-<p><a href="/login">Login</a></p>
+<a href="/login">Login</a>
 
-</div>
-
-</body>
-</html>
+</div></body></html>
     `);
 });
 
 app.post('/signup', (req, res) => {
     let { user, pass } = req.body;
 
-    if (!user || !pass) return res.send("Missing fields");
+    if (!user || !pass) return res.send("Missing");
 
-    let clean = user.trim().toLowerCase();
+    let clean = user.toLowerCase();
 
     for (let u in users) {
-        if (u.toLowerCase() === clean) {
-            return res.send("Username already taken");
-        }
+        if (u.toLowerCase() === clean) return res.send("Taken");
     }
 
     users[user] = pass;
@@ -175,29 +156,20 @@ app.post('/signup', (req, res) => {
 // ================= LOGIN =================
 app.get('/login', (req, res) => {
     res.send(`
-<!DOCTYPE html>
-<html>
-<head><title>Login</title>${style}</head>
+<html><head><title>Login</title>${style}</head>
 <body>
-
-<div class="topbar">Login Portal</div>
-
+<div class="topbar">Login</div>
 <div class="container">
 
-<h2>Login</h2>
-
 <form method="POST" action="/login">
-<input name="user" placeholder="username" required><br>
+<input name="user" required><br>
 <input name="pass" type="password" required><br>
 <button>Login</button>
 </form>
 
-<p><a href="/signup">Sign Up</a></p>
+<a href="/signup">Signup</a>
 
-</div>
-
-</body>
-</html>
+</div></body></html>
     `);
 });
 
@@ -213,12 +185,12 @@ app.post('/login', (req, res) => {
         return res.redirect('/');
     }
 
-    res.send("Invalid login");
+    res.send("Invalid");
 });
 
 // ================= LOGOUT =================
 app.get('/logout', (req, res) => {
-    res.setHeader('Set-Cookie', 'user=; Path=/; Max-Age=0');
+    res.setHeader('Set-Cookie', 'user=; Max-Age=0; Path=/');
     res.redirect('/login');
 });
 
@@ -228,37 +200,31 @@ app.get('/', (req, res) => {
     if (!user) return res.redirect('/login');
 
     res.send(`
-<!DOCTYPE html>
-<html>
-<head><title>OpenShare</title>${style}</head>
+<html><head><title>OpenShare</title>${style}</head>
 <body>
 
-<div class="topbar">OpenShare Archive</div>
+<div class="topbar">OpenShare Realm</div>
 
 <div class="container">
 
 <p>
-Logged in as: <b>${user}</b> |
+Logged in as <b>${user}</b> |
+<a href="/forums">Forums</a> |
+<a href="/admin">Admin</a> |
 <a href="/logout">Logout</a>
 </p>
 
+<h3>Upload File</h3>
+
 <form id="uploadForm">
-Title: <input name="title" required />
-<input type="file" name="file" required />
+<input name="title" placeholder="title" required>
+<input type="file" name="file" required>
 <button>Upload</button>
 </form>
 
 <hr>
 
-<table>
-<tr>
-<th>File</th>
-<th>Link</th>
-<th>Uploader</th>
-</tr>
-
-<tbody id="list"></tbody>
-</table>
+<div id="list"></div>
 
 </div>
 
@@ -269,11 +235,11 @@ async function load() {
 
     document.getElementById('list').innerHTML =
         data.map(f => \`
-            <tr>
-                <td>\${f.title}</td>
-                <td><a href="\${f.url}" target="_blank">Open</a></td>
-                <td class="small">\${f.user}</td>
-            </tr>
+            <div class="card">
+                <b>\${f.title}</b><br>
+                <a href="\${f.url}" target="_blank">Open</a><br>
+                <small>by \${f.user}</small>
+            </div>
         \`).join('');
 }
 
@@ -281,10 +247,7 @@ document.getElementById('uploadForm').onsubmit = async (e) => {
     e.preventDefault();
     let fd = new FormData(e.target);
 
-    await fetch('/upload', {
-        method: 'POST',
-        body: fd
-    });
+    await fetch('/upload', { method:'POST', body:fd });
 
     e.target.reset();
     load();
@@ -293,8 +256,7 @@ document.getElementById('uploadForm').onsubmit = async (e) => {
 load();
 </script>
 
-</body>
-</html>
+</body></html>
     `);
 });
 
@@ -307,36 +269,96 @@ app.post('/upload', upload.single('file'), (req, res) => {
         title: req.body.title,
         url: '/uploads/' + req.file.filename,
         file: req.file.filename,
-        user: user,
-        time: new Date().toLocaleString()
+        user: user
     });
 
     res.sendStatus(200);
 });
 
-// ================= FILE LIST =================
+// ================= FILES =================
 app.get('/files', (req, res) => {
     res.json(files);
 });
 
-// ================= DELETE (ADMIN ONLY) =================
-app.delete('/delete/:id', (req, res) => {
-    if (!isAdmin(req)) return res.sendStatus(403);
+// ================= FORUMS =================
+app.get('/forums', (req, res) => {
+    const user = getUser(req);
+    if (!user) return res.redirect('/login');
 
-    const file = files[req.params.id];
-    if (!file) return res.sendStatus(404);
+    res.send(`
+<html><head><title>Forums</title>${style}</head>
+<body>
 
-    const filePath = path.join(__dirname, 'uploads', file.file);
+<div class="topbar">Realm Forums</div>
 
-    if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-    }
+<div class="container">
 
-    files.splice(req.params.id, 1);
-    res.sendStatus(200);
+<a href="/">Back</a>
+
+<h3>Create Post</h3>
+
+<form method="POST" action="/forums">
+<input name="title" placeholder="title" required><br>
+<textarea name="content" placeholder="message" required></textarea><br>
+<button>Post</button>
+</form>
+
+<hr>
+
+${posts.map(p => `
+<div class="card">
+<b>${p.title}</b><br>
+${p.content}<br>
+<small>by ${p.user}</small>
+</div>
+`).join('')}
+
+</div>
+</body></html>
+    `);
 });
 
-// ================= START SERVER =================
+app.post('/forums', (req, res) => {
+    const user = getUser(req);
+    if (!user) return res.sendStatus(403);
+
+    posts.unshift({
+        title: req.body.title,
+        content: req.body.content,
+        user
+    });
+
+    res.redirect('/forums');
+});
+
+// ================= ADMIN =================
+app.get('/admin', (req, res) => {
+    if (!isAdmin(req)) return res.redirect('/');
+
+    res.send(`
+<html><head><title>Admin</title>${style}</head>
+<body>
+
+<div class="topbar">Admin Control</div>
+
+<div class="container">
+
+<h3>Users</h3>
+<pre>${JSON.stringify(users, null, 2)}</pre>
+
+<h3>Files</h3>
+<pre>${JSON.stringify(files, null, 2)}</pre>
+
+<h3>Posts</h3>
+<pre>${JSON.stringify(posts, null, 2)}</pre>
+
+</div>
+
+</body></html>
+    `);
+});
+
+// ================= START =================
 app.listen(PORT, () => {
-    console.log("Server running on port " + PORT);
+    console.log("Running on " + PORT);
 });
