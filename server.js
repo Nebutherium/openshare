@@ -6,127 +6,132 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ✅ ensure uploads folder exists
 if (!fs.existsSync('uploads')) {
     fs.mkdirSync('uploads');
 }
 
-// storage config
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'uploads/');
-    },
-    filename: (req, file, cb) => {
-        cb(null, Date.now() + '-' + file.originalname);
-    }
+    destination: (req, file, cb) => cb(null, 'uploads/'),
+    filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
 });
 
-const upload = multer({
-    storage,
-    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
-});
+const upload = multer({ storage });
 
-// in-memory list (resets on restart)
 let files = [];
 
-// serve uploads
 app.use('/uploads', express.static('uploads'));
 
-// main page
+// MAIN SITE
 app.get('/', (req, res) => {
     res.send(`
-<!DOCTYPE html>
-<html>
-<head>
-<title>OpenShare</title>
-<style>
-body { font-family: Verdana; background:white; font-size:13px; }
-.container { width:80%; margin:auto; }
-table { width:100%; border-collapse:collapse; }
-th,td { border-bottom:1px solid #ccc; padding:5px; }
-a { color:blue; }
-</style>
-</head>
-<body>
-
-<div class="container">
 <h2>OpenShare</h2>
 
 <form id="uploadForm">
-Title: <input type="text" name="title" required><br><br>
-File: <input type="file" name="file" required><br><br>
-<button type="submit">Upload</button>
+<input name="title" placeholder="title" required />
+<input type="file" name="file" required />
+<button>Upload</button>
 </form>
 
 <hr>
 
-<table>
-<thead>
-<tr><th>Name</th><th>Download</th></tr>
-</thead>
-<tbody id="files"></tbody>
-</table>
-</div>
+<div id="list"></div>
 
 <script>
-async function loadFiles() {
-    let res = await fetch('/files');
-    let data = await res.json();
+async function load() {
+    let r = await fetch('/files');
+    let d = await r.json();
 
-    let container = document.getElementById("files");
-    container.innerHTML = "";
-
-    data.forEach(f => {
-        let row = document.createElement("tr");
-        row.innerHTML = \`
-            <td>\${f.title}</td>
-            <td><a href="\${f.url}" download>Download</a></td>
-        \`;
-        container.appendChild(row);
-    });
+    document.getElementById('list').innerHTML =
+        d.map((f,i)=>`
+            <div>
+                <a href="${f.url}" target="_blank">${f.title}</a>
+            </div>
+        `).join('');
 }
 
-document.getElementById("uploadForm").onsubmit = async (e) => {
+document.getElementById('uploadForm').onsubmit = async (e) => {
     e.preventDefault();
-    let formData = new FormData(e.target);
+    let fd = new FormData(e.target);
 
-    await fetch('/upload', {
-        method: 'POST',
-        body: formData
-    });
+    await fetch('/upload', { method:'POST', body: fd });
 
     e.target.reset();
-    loadFiles();
+    load();
 };
 
-loadFiles();
+load();
 </script>
-
-</body>
-</html>
     `);
 });
 
-// upload route
+// ADMIN PAGE
+app.get('/admin', (req, res) => {
+    res.send(`
+<h2>Admin Panel</h2>
+<p>Delete uploaded files</p>
+
+<div id="adminList"></div>
+
+<script>
+async function loadAdmin() {
+    let r = await fetch('/files');
+    let d = await r.json();
+
+    document.getElementById('adminList').innerHTML =
+        d.map((f,i)=>`
+            <div style="margin-bottom:10px;">
+                <a href="${f.url}" target="_blank">${f.title}</a>
+                <button onclick="del(${i})">Delete</button>
+            </div>
+        `).join('');
+}
+
+async function del(i) {
+    await fetch('/delete/' + i, { method:'DELETE' });
+    loadAdmin();
+}
+
+loadAdmin();
+</script>
+    `);
+});
+
+// UPLOAD
 app.post('/upload', upload.single('file'), (req, res) => {
-    if (!req.file) {
-        return res.status(400).send("No file uploaded");
-    }
+    if (!req.file) return res.sendStatus(400);
 
     files.unshift({
         title: req.body.title,
-        url: '/uploads/' + req.file.filename
+        url: '/uploads/' + req.file.filename,
+        file: req.file.filename
     });
 
     res.sendStatus(200);
 });
 
-// list files
+// LIST
 app.get('/files', (req, res) => {
     res.json(files);
 });
 
-// start server
+// DELETE FILE (ADMIN)
+app.delete('/delete/:id', (req, res) => {
+    const id = req.params.id;
+    const file = files[id];
+
+    if (!file) return res.sendStatus(404);
+
+    const filePath = path.join(__dirname, 'uploads', file.file);
+
+    if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+    }
+
+    files.splice(id, 1);
+
+    res.sendStatus(200);
+});
+
 app.listen(PORT, () => {
-    console.log("Running on port " + PORT);
+    console.log("Running on " + PORT);
 });
