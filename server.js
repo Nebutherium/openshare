@@ -18,10 +18,6 @@ function getUser(req) {
     return match ? match[1] : null;
 }
 
-function isAdmin(req) {
-    return getUser(req) === "admin";
-}
-
 // ================= MIDDLEWARE =================
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
@@ -102,7 +98,9 @@ app.get('/signup', (req, res) => {
     res.send(`
 <html><head>${style}</head>
 <body>
+
 <div class="topbar">Create Account</div>
+
 <div class="container">
 
 <form method="POST" action="/signup">
@@ -114,6 +112,7 @@ app.get('/signup', (req, res) => {
 <a href="/login">Login</a>
 
 </div>
+
 </body></html>
     `);
 });
@@ -142,7 +141,9 @@ app.get('/login', (req, res) => {
     res.send(`
 <html><head>${style}</head>
 <body>
+
 <div class="topbar">Login</div>
+
 <div class="container">
 
 <form method="POST" action="/login">
@@ -154,6 +155,7 @@ app.get('/login', (req, res) => {
 <a href="/signup">Signup</a>
 
 </div>
+
 </body></html>
     `);
 });
@@ -195,11 +197,10 @@ app.get('/', (req, res) => {
 <p>
 Logged in as <b>${user}</b> |
 <a href="/forums">Forums</a> |
-<a href="/admin">Admin</a> |
 <a href="/logout">Logout</a>
 </p>
 
-<h3>Upload</h3>
+<h3>Upload File</h3>
 
 <form id="uploadForm">
 <input name="title" required>
@@ -249,6 +250,11 @@ app.post('/upload', upload.single('file'), (req, res) => {
     res.sendStatus(200);
 });
 
+// ================= FILE LIST =================
+app.get('/files', (req, res) => {
+    res.json(files);
+});
+
 // ================= FORUMS =================
 app.get('/forums', (req, res) => {
     const user = getUser(req);
@@ -264,15 +270,17 @@ app.get('/forums', (req, res) => {
 
 <a href="/">Back</a>
 
+<h3>Create Post</h3>
+
 <form method="POST" action="/forums">
-<input name="title" placeholder="title" required><br>
+<input name="title" required><br>
 <textarea name="content" required></textarea><br>
 <button>Post</button>
 </form>
 
 <hr>
 
-${posts.map((p,i) => `
+${posts.map(p => `
 <div class="card">
 <b>${p.title}</b><br>
 ${p.content}<br>
@@ -281,6 +289,7 @@ ${p.content}<br>
 `).join('')}
 
 </div>
+
 </body></html>
     `);
 });
@@ -296,76 +305,6 @@ app.post('/forums', (req, res) => {
     });
 
     res.redirect('/forums');
-});
-
-// ================= ADMIN =================
-app.get('/admin', (req, res) => {
-    if (!isAdmin(req)) return res.redirect('/');
-
-    res.send(`
-<html><head>${style}</head>
-<body>
-
-<div class="topbar">Admin Control</div>
-
-<div class="container">
-
-<h3>Users</h3>
-<pre>${JSON.stringify(users, null, 2)}</pre>
-
-<h3>Files</h3>
-
-${files.map((f,i) => `
-<div class="card">
-<b>${f.title}</b> by ${f.user}<br>
-<a href="${f.url}" target="_blank">Open</a>
-
-<form method="POST" action="/admin/delete-file/${i}">
-<button>Delete File</button>
-</form>
-</div>
-`).join('')}
-
-<h3>Posts</h3>
-
-${posts.map((p,i) => `
-<div class="card">
-<b>${p.title}</b><br>
-${p.content}<br>
-<small>${p.user}</small>
-
-<form method="POST" action="/admin/delete-post/${i}">
-<button>Delete Post</button>
-</form>
-</div>
-`).join('')}
-
-</div>
-
-</body></html>
-    `);
-});
-
-// DELETE FILE
-app.post('/admin/delete-file/:id', (req, res) => {
-    if (!isAdmin(req)) return res.sendStatus(403);
-
-    const f = files[req.params.id];
-    if (f) {
-        const p = path.join(__dirname, 'uploads', f.file);
-        if (fs.existsSync(p)) fs.unlinkSync(p);
-        files.splice(req.params.id, 1);
-    }
-
-    res.redirect('/admin');
-});
-
-// DELETE POST
-app.post('/admin/delete-post/:id', (req, res) => {
-    if (!isAdmin(req)) return res.sendStatus(403);
-
-    posts.splice(req.params.id, 1);
-    res.redirect('/admin');
 });
 
 // ================= START =================
