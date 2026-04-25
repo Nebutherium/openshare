@@ -1,20 +1,32 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// storage
+// ✅ ensure uploads folder exists
+if (!fs.existsSync('uploads')) {
+    fs.mkdirSync('uploads');
+}
+
+// storage config
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, 'uploads/'),
-    filename: (req, file, cb) =>
-        cb(null, Date.now() + path.extname(file.originalname))
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/');
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + '-' + file.originalname);
+    }
 });
 
-const upload = multer({ storage });
+const upload = multer({
+    storage,
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+});
 
-// memory list
+// in-memory list (resets on restart)
 let files = [];
 
 // serve uploads
@@ -95,18 +107,26 @@ loadFiles();
     `);
 });
 
-// upload
+// upload route
 app.post('/upload', upload.single('file'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).send("No file uploaded");
+    }
+
     files.unshift({
         title: req.body.title,
         url: '/uploads/' + req.file.filename
     });
+
     res.sendStatus(200);
 });
 
-// list
+// list files
 app.get('/files', (req, res) => {
     res.json(files);
 });
 
-app.listen(PORT, () => console.log("Running on port " + PORT));
+// start server
+app.listen(PORT, () => {
+    console.log("Running on port " + PORT);
+});
