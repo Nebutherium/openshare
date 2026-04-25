@@ -3,25 +3,24 @@ const multer = require('multer');
 const path = require('path');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
-// storage setup
+// storage
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, 'uploads/'),
-    filename: (req, file, cb) => {
-        cb(null, Date.now() + path.extname(file.originalname));
-    }
+    filename: (req, file, cb) =>
+        cb(null, Date.now() + path.extname(file.originalname))
 });
 
 const upload = multer({ storage });
 
-// in-memory file list
+// memory list
 let files = [];
 
 // serve uploads
 app.use('/uploads', express.static('uploads'));
 
-// MAIN PAGE
+// main page
 app.get('/', (req, res) => {
     res.send(`
 <!DOCTYPE html>
@@ -96,7 +95,7 @@ loadFiles();
     `);
 });
 
-// upload route
+// upload
 app.post('/upload', upload.single('file'), (req, res) => {
     files.unshift({
         title: req.body.title,
@@ -105,12 +104,9 @@ app.post('/upload', upload.single('file'), (req, res) => {
     res.sendStatus(200);
 });
 
-// list files
+// list
 app.get('/files', (req, res) => {
     res.json(files);
 });
 
-// start server
-app.listen(PORT, () => {
-    console.log("Running on http://localhost:3000");
-});
+app.listen(PORT, () => console.log("Running on port " + PORT));
