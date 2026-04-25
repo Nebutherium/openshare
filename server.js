@@ -7,18 +7,14 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ================= DATA =================
-let users = {}; // { username: password }
-let files = []; // uploaded files
+let users = {}; // username -> password
+let files = [];
 
 // ================= HELPERS =================
 function getUser(req) {
     const cookie = req.headers.cookie || "";
     const match = cookie.match(/user=([^;]+)/);
     return match ? match[1] : null;
-}
-
-function isLoggedIn(req) {
-    return !!getUser(req);
 }
 
 function isAdmin(req) {
@@ -44,10 +40,116 @@ const upload = multer({ storage });
 
 app.use('/uploads', express.static('uploads'));
 
-// ================= SIGN UP PAGE =================
+// ================= WOW CSS =================
+const style = `
+<style>
+body {
+    margin: 0;
+    font-family: Georgia, serif;
+    background: url('https://i.imgur.com/3ZQ3Z9m.jpg');
+    background-size: cover;
+    color: #f5deb3;
+}
+
+/* FRAME */
+.container {
+    width: 80%;
+    margin: 30px auto;
+    padding: 20px;
+    background: rgba(10,10,10,0.85);
+    border: 3px solid #c9a227;
+    box-shadow: 0 0 25px rgba(0,0,0,0.8);
+}
+
+/* TOP BAR */
+.topbar {
+    background: linear-gradient(#3b2a1a, #1a120b);
+    color: #ffd700;
+    padding: 12px;
+    font-size: 20px;
+    font-weight: bold;
+    border-bottom: 2px solid #c9a227;
+    text-shadow: 0 0 5px black;
+}
+
+/* LINKS */
+a {
+    color: #ffd700;
+    text-decoration: none;
+}
+
+a:hover {
+    color: #fff2a8;
+    text-shadow: 0 0 5px gold;
+}
+
+/* INPUTS */
+input, button {
+    font-family: Georgia, serif;
+    padding: 6px;
+    margin: 5px 0;
+    background: #1a1a1a;
+    border: 1px solid #c9a227;
+    color: #f5deb3;
+}
+
+button {
+    cursor: pointer;
+    background: linear-gradient(#3b2a1a, #1a120b);
+}
+
+button:hover {
+    background: #4a351f;
+}
+
+/* TABLE */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    background: rgba(0,0,0,0.4);
+}
+
+th {
+    background: #2a1d12;
+    color: #ffd700;
+    padding: 10px;
+    border-bottom: 2px solid #c9a227;
+}
+
+td {
+    padding: 10px;
+    border-bottom: 1px solid #3a2a1a;
+}
+
+tr:hover {
+    background: rgba(201,162,39,0.1);
+}
+
+/* SMALL TEXT */
+.small {
+    font-size: 11px;
+    color: #c0b283;
+}
+</style>
+`;
+
+// ================= SIGNUP =================
 app.get('/signup', (req, res) => {
     res.send(`
-<h2>Sign Up</h2>
+<!DOCTYPE html>
+<html>
+<head>
+<title>Sign Up</title>
+${style}
+</head>
+<body>
+
+<div class="topbar">Create Account</div>
+
+<div class="container">
+
+<h2>Join the Realm</h2>
 
 <form method="POST" action="/signup">
 <input name="user" placeholder="username" required><br>
@@ -55,11 +157,15 @@ app.get('/signup', (req, res) => {
 <button>Create Account</button>
 </form>
 
-<p><a href="/login">Already have an account? Login</a></p>
+<p><a href="/login">Already have an account?</a></p>
+
+</div>
+
+</body>
+</html>
     `);
 });
 
-// SIGN UP ACTION
 app.post('/signup', (req, res) => {
     const { user, pass } = req.body;
 
@@ -75,7 +181,19 @@ app.post('/signup', (req, res) => {
 // ================= LOGIN =================
 app.get('/login', (req, res) => {
     res.send(`
-<h2>Login</h2>
+<!DOCTYPE html>
+<html>
+<head>
+<title>Login</title>
+${style}
+</head>
+<body>
+
+<div class="topbar">Portal Login</div>
+
+<div class="container">
+
+<h2>Enter the Realm</h2>
 
 <form method="POST" action="/login">
 <input name="user" placeholder="username" required><br>
@@ -84,6 +202,11 @@ app.get('/login', (req, res) => {
 </form>
 
 <p><a href="/signup">Create account</a></p>
+
+</div>
+
+</body>
+</html>
     `);
 });
 
@@ -107,11 +230,20 @@ app.get('/logout', (req, res) => {
 // ================= HOME =================
 app.get('/', (req, res) => {
     const user = getUser(req);
-
     if (!user) return res.redirect('/login');
 
     res.send(`
-<h2>OpenShare</h2>
+<!DOCTYPE html>
+<html>
+<head>
+<title>OpenShare</title>
+${style}
+</head>
+<body>
+
+<div class="topbar">OpenShare Archive</div>
+
+<div class="container">
 
 <p>
 Logged in as: <b>${user}</b> |
@@ -121,12 +253,22 @@ Logged in as: <b>${user}</b> |
 <form id="uploadForm">
 Title: <input name="title" required />
 <input type="file" name="file" required />
-<button>Upload</button>
+<button>Upload Relic</button>
 </form>
 
 <hr>
 
-<div id="list"></div>
+<table>
+<tr>
+<th>File</th>
+<th>Download</th>
+<th>Uploader</th>
+</tr>
+
+<tbody id="list"></tbody>
+</table>
+
+</div>
 
 <script>
 async function load() {
@@ -135,11 +277,11 @@ async function load() {
 
     document.getElementById('list').innerHTML =
         data.map(f => \`
-            <div style="border:1px solid #ccc;padding:10px;margin:5px;">
-                <b>\${f.title}</b><br>
-                <a href="\${f.url}" target="_blank">Download</a><br>
-                <small>Uploaded by: \${f.user}</small>
-            </div>
+            <tr>
+                <td>\${f.title}</td>
+                <td><a href="\${f.url}" target="_blank">Open</a></td>
+                <td class="small">\${f.user}</td>
+            </tr>
         \`).join('');
 }
 
@@ -158,13 +300,15 @@ document.getElementById('uploadForm').onsubmit = async (e) => {
 
 load();
 </script>
+
+</body>
+</html>
     `);
 });
 
 // ================= UPLOAD =================
 app.post('/upload', upload.single('file'), (req, res) => {
     const user = getUser(req);
-
     if (!req.file || !user) return res.sendStatus(400);
 
     files.unshift({
@@ -183,7 +327,7 @@ app.get('/files', (req, res) => {
     res.json(files);
 });
 
-// ================= ADMIN DELETE =================
+// ================= DELETE (ADMIN ONLY) =================
 app.delete('/delete/:id', (req, res) => {
     if (!isAdmin(req)) return res.sendStatus(403);
 
@@ -197,7 +341,6 @@ app.delete('/delete/:id', (req, res) => {
     }
 
     files.splice(req.params.id, 1);
-
     res.sendStatus(200);
 });
 
