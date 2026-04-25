@@ -6,11 +6,11 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ===== ADMIN CREDENTIALS =====
+// ===== ADMIN LOGIN =====
 const ADMIN_USER = "admin";
 const ADMIN_PASS = "1234";
 
-// ===== SIMPLE COOKIE CHECK =====
+// simple cookie auth
 function isAdmin(req) {
     return req.headers.cookie && req.headers.cookie.includes("auth=1");
 }
@@ -33,72 +33,58 @@ let files = [];
 app.use('/uploads', express.static('uploads'));
 app.use(express.urlencoded({ extended: true }));
 
-// ================= LOGIN PAGE =================
-app.get('/login', (req, res) => {
-    res.send(`
-<h2>Admin Login</h2>
-
-<form method="POST" action="/login">
-<input name="user" placeholder="username" required><br><br>
-<input name="pass" type="password" placeholder="password" required><br><br>
-<button>Login</button>
-</form>
-    `);
-});
-
-// LOGIN ACTION
-app.post('/login', (req, res) => {
-    const { user, pass } = req.body;
-
-    if (user === ADMIN_USER && pass === ADMIN_PASS) {
-        res.setHeader('Set-Cookie', 'auth=1; Path=/');
-        return res.redirect('/admin');
-    }
-
-    res.send("Wrong login");
-});
-
-// LOGOUT
-app.get('/logout', (req, res) => {
-    res.setHeader('Set-Cookie', 'auth=0; Path=/; Max-Age=0');
-    res.redirect('/');
-});
-
-// ================= MAIN SITE =================
+// ================= HOME =================
 app.get('/', (req, res) => {
     res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+<title>OpenShare</title>
+<style>
+body { font-family: Verdana; background: white; font-size: 13px; }
+.container { width: 80%; margin: auto; }
+a { color: blue; }
+</style>
+</head>
+<body>
+
+<div class="container">
 <h2>OpenShare</h2>
 
 <p><a href="/login">Admin Login</a></p>
 
 <form id="uploadForm">
-Title: <input name="title" required>
-<input type="file" name="file" required>
+Title: <input name="title" required />
+<input type="file" name="file" required />
 <button>Upload</button>
 </form>
 
 <hr>
 
 <div id="list"></div>
+</div>
 
 <script>
 async function load() {
-    let r = await fetch('/files');
-    let d = await r.json();
+    let res = await fetch('/files');
+    let data = await res.json();
 
     document.getElementById('list').innerHTML =
-        d.map(f => `
+        data.map(f => \`
             <div>
-                <a href="${f.url}" target="_blank">${f.title}</a>
+                <a href="\${f.url}" target="_blank">\${f.title}</a>
             </div>
-        `).join('');
+        \`).join('');
 }
 
 document.getElementById('uploadForm').onsubmit = async (e) => {
     e.preventDefault();
     let fd = new FormData(e.target);
 
-    await fetch('/upload', { method:'POST', body: fd });
+    await fetch('/upload', {
+        method: 'POST',
+        body: fd
+    });
 
     e.target.reset();
     load();
@@ -106,10 +92,52 @@ document.getElementById('uploadForm').onsubmit = async (e) => {
 
 load();
 </script>
+
+</body>
+</html>
     `);
 });
 
-// ================= ADMIN PAGE =================
+// ================= LOGIN =================
+app.get('/login', (req, res) => {
+    res.send(`
+<h2>Admin Login</h2>
+
+<form method="POST" action="/login">
+<input name="user" placeholder="username" required /><br><br>
+<input name="pass" type="password" placeholder="password" required /><br><br>
+<button>Login</button>
+</form>
+    `);
+});
+
+app.post('/login', (req, res) => {
+    const body = [];
+
+    req.on('data', chunk => body.push(chunk));
+    req.on('end', () => {
+        const data = Buffer.concat(body).toString();
+        const params = new URLSearchParams(data);
+
+        const user = params.get("user");
+        const pass = params.get("pass");
+
+        if (user === ADMIN_USER && pass === ADMIN_PASS) {
+            res.setHeader('Set-Cookie', 'auth=1; Path=/');
+            return res.redirect('/admin');
+        }
+
+        res.send("Wrong login");
+    });
+});
+
+// ================= LOGOUT =================
+app.get('/logout', (req, res) => {
+    res.setHeader('Set-Cookie', 'auth=0; Path=/; Max-Age=0');
+    res.redirect('/');
+});
+
+// ================= ADMIN =================
 app.get('/admin', (req, res) => {
     if (!isAdmin(req)) return res.redirect('/login');
 
@@ -121,20 +149,20 @@ app.get('/admin', (req, res) => {
 
 <script>
 async function loadAdmin() {
-    let r = await fetch('/files');
-    let d = await r.json();
+    let res = await fetch('/files');
+    let data = await res.json();
 
     document.getElementById('adminList').innerHTML =
-        d.map((f,i)=>`
+        data.map((f,i) => \`
             <div>
-                <a href="${f.url}" target="_blank">${f.title}</a>
-                <button onclick="del(${i})">Delete</button>
+                <a href="\${f.url}" target="_blank">\${f.title}</a>
+                <button onclick="del(\${i})">Delete</button>
             </div>
-        `).join('');
+        \`).join('');
 }
 
 async function del(i) {
-    await fetch('/delete/' + i, { method:'DELETE' });
+    await fetch('/delete/' + i, { method: 'DELETE' });
     loadAdmin();
 }
 
