@@ -6,16 +6,20 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ===== ADMIN LOGIN =====
+// ================= ADMIN =================
 const ADMIN_USER = "admin";
 const ADMIN_PASS = "1234";
 
-// simple cookie auth
+// simple cookie check
 function isAdmin(req) {
     return req.headers.cookie && req.headers.cookie.includes("auth=1");
 }
 
-// ===== FILE SETUP =====
+// ================= IMPORTANT FIX =================
+app.use(express.urlencoded({ extended: true })); // <-- FIX LOGIN
+app.use(express.json());
+
+// ================= FILE SETUP =================
 if (!fs.existsSync('uploads')) {
     fs.mkdirSync('uploads');
 }
@@ -31,9 +35,8 @@ const upload = multer({ storage });
 let files = [];
 
 app.use('/uploads', express.static('uploads'));
-app.use(express.urlencoded({ extended: true }));
 
-// ================= HOME =================
+// ================= HOME PAGE =================
 app.get('/', (req, res) => {
     res.send(`
 <!DOCTYPE html>
@@ -41,9 +44,9 @@ app.get('/', (req, res) => {
 <head>
 <title>OpenShare</title>
 <style>
-body { font-family: Verdana; background: white; font-size: 13px; }
-.container { width: 80%; margin: auto; }
-a { color: blue; }
+body { font-family: Verdana; background:white; font-size:13px; }
+.container { width:80%; margin:auto; }
+a { color:blue; }
 </style>
 </head>
 <body>
@@ -98,37 +101,29 @@ load();
     `);
 });
 
-// ================= LOGIN =================
+// ================= LOGIN PAGE =================
 app.get('/login', (req, res) => {
     res.send(`
 <h2>Admin Login</h2>
 
 <form method="POST" action="/login">
-<input name="user" placeholder="username" required /><br><br>
-<input name="pass" type="password" placeholder="password" required /><br><br>
+<input name="user" placeholder="username" required><br><br>
+<input name="pass" type="password" placeholder="password" required><br><br>
 <button>Login</button>
 </form>
     `);
 });
 
+// ================= LOGIN FIXED =================
 app.post('/login', (req, res) => {
-    const body = [];
+    const { user, pass } = req.body;
 
-    req.on('data', chunk => body.push(chunk));
-    req.on('end', () => {
-        const data = Buffer.concat(body).toString();
-        const params = new URLSearchParams(data);
+    if (user === ADMIN_USER && pass === ADMIN_PASS) {
+        res.setHeader('Set-Cookie', 'auth=1; Path=/');
+        return res.redirect('/admin');
+    }
 
-        const user = params.get("user");
-        const pass = params.get("pass");
-
-        if (user === ADMIN_USER && pass === ADMIN_PASS) {
-            res.setHeader('Set-Cookie', 'auth=1; Path=/');
-            return res.redirect('/admin');
-        }
-
-        res.send("Wrong login");
-    });
+    res.send("Wrong login");
 });
 
 // ================= LOGOUT =================
@@ -137,7 +132,7 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
 });
 
-// ================= ADMIN =================
+// ================= ADMIN PAGE =================
 app.get('/admin', (req, res) => {
     if (!isAdmin(req)) return res.redirect('/login');
 
