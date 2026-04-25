@@ -10,16 +10,15 @@ const PORT = process.env.PORT || 3000;
 const ADMIN_USER = "admin";
 const ADMIN_PASS = "1234";
 
-// simple cookie check
 function isAdmin(req) {
     return req.headers.cookie && req.headers.cookie.includes("auth=1");
 }
 
-// ================= IMPORTANT FIX =================
-app.use(express.urlencoded({ extended: true })); // <-- FIX LOGIN
+// ================= BODY PARSER =================
+app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// ================= FILE SETUP =================
+// ================= FILE STORAGE =================
 if (!fs.existsSync('uploads')) {
     fs.mkdirSync('uploads');
 }
@@ -52,6 +51,7 @@ a { color:blue; }
 <body>
 
 <div class="container">
+
 <h2>OpenShare</h2>
 
 <p><a href="/login">Admin Login</a></p>
@@ -65,6 +65,7 @@ Title: <input name="title" required />
 <hr>
 
 <div id="list"></div>
+
 </div>
 
 <script>
@@ -101,7 +102,7 @@ load();
     `);
 });
 
-// ================= LOGIN PAGE =================
+// ================= LOGIN =================
 app.get('/login', (req, res) => {
     res.send(`
 <h2>Admin Login</h2>
@@ -114,7 +115,6 @@ app.get('/login', (req, res) => {
     `);
 });
 
-// ================= LOGIN FIXED =================
 app.post('/login', (req, res) => {
     const { user, pass } = req.body;
 
@@ -132,25 +132,64 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
 });
 
-// ================= ADMIN PAGE =================
+// ================= ADMIN PANEL =================
 app.get('/admin', (req, res) => {
     if (!isAdmin(req)) return res.redirect('/login');
 
     res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+<title>Admin Panel</title>
+<style>
+body { font-family: Verdana; background:white; font-size:13px; }
+.container { width:80%; margin:auto; }
+.card { border:1px solid #ccc; padding:10px; margin-bottom:10px; }
+button { margin:2px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
 <h2>Admin Panel</h2>
+
+<p>
+<button onclick="load()">Refresh</button>
+<button onclick="deleteAll()">Delete All</button>
 <a href="/logout">Logout</a>
+</p>
+
+<input id="search" placeholder="Search..." onkeyup="load()">
+
+<div id="stats"></div>
+<hr>
 
 <div id="adminList"></div>
 
+</div>
+
 <script>
-async function loadAdmin() {
+
+async function load() {
     let res = await fetch('/files');
     let data = await res.json();
 
+    let q = document.getElementById('search').value.toLowerCase();
+
+    let filtered = data.filter(f =>
+        f.title.toLowerCase().includes(q)
+    );
+
+    document.getElementById('stats').innerHTML =
+        "<b>Total files:</b> " + data.length;
+
     document.getElementById('adminList').innerHTML =
-        data.map((f,i) => \`
-            <div>
-                <a href="\${f.url}" target="_blank">\${f.title}</a>
+        filtered.map((f,i) => \`
+            <div class="card">
+                <b>\${f.title}</b><br>
+                <a href="\${f.url}" target="_blank">Open</a><br>
+                <small>\${f.size || "unknown"} bytes</small><br>
                 <button onclick="del(\${i})">Delete</button>
             </div>
         \`).join('');
@@ -158,11 +197,26 @@ async function loadAdmin() {
 
 async function del(i) {
     await fetch('/delete/' + i, { method: 'DELETE' });
-    loadAdmin();
+    load();
 }
 
-loadAdmin();
+async function deleteAll() {
+    let res = await fetch('/files');
+    let data = await res.json();
+
+    for (let i = data.length - 1; i >= 0; i--) {
+        await fetch('/delete/' + i, { method: 'DELETE' });
+    }
+
+    load();
+}
+
+load();
+
 </script>
+
+</body>
+</html>
     `);
 });
 
@@ -173,7 +227,9 @@ app.post('/upload', upload.single('file'), (req, res) => {
     files.unshift({
         title: req.body.title,
         url: '/uploads/' + req.file.filename,
-        file: req.file.filename
+        file: req.file.filename,
+        size: req.file.size,
+        time: new Date().toLocaleString()
     });
 
     res.sendStatus(200);
