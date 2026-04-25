@@ -14,11 +14,10 @@ function isAdmin(req) {
     return req.headers.cookie && req.headers.cookie.includes("auth=1");
 }
 
-// ================= PARSER =================
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// ================= FILE STORAGE =================
+// ================= STORAGE =================
 if (!fs.existsSync('uploads')) {
     fs.mkdirSync('uploads');
 }
@@ -35,32 +34,34 @@ let files = [];
 
 app.use('/uploads', express.static('uploads'));
 
-// ================= GLOBAL STYLE =================
+// ================= RETRO STYLE =================
 const style = `
 <style>
 body {
-    font-family: Arial, sans-serif;
-    background: #f4f4f4;
+    font-family: "Courier New", monospace;
+    background: #eaeaea;
     margin: 0;
-    padding: 0;
     color: #111;
 }
 
-.container {
-    width: 85%;
-    margin: auto;
-    background: white;
-    padding: 20px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+.topbar {
+    background: #111;
+    color: white;
+    padding: 10px;
+    font-weight: bold;
 }
 
-h2 {
-    border-bottom: 2px solid #ddd;
-    padding-bottom: 5px;
+.container {
+    width: 90%;
+    max-width: 1000px;
+    margin: 20px auto;
+    background: white;
+    padding: 15px;
+    border: 2px solid #ccc;
 }
 
 a {
-    color: #0645ad;
+    color: #0000cc;
     text-decoration: none;
 }
 
@@ -69,31 +70,52 @@ a:hover {
 }
 
 input, button {
-    padding: 6px;
+    padding: 5px;
     margin: 4px 0;
+    font-family: monospace;
 }
 
 button {
-    cursor: pointer;
-    background: #333;
+    background: #222;
     color: white;
     border: none;
+    cursor: pointer;
 }
 
 button:hover {
-    background: #555;
+    background: #444;
 }
 
-.card {
-    border: 1px solid #ddd;
-    padding: 10px;
-    margin-bottom: 10px;
-    background: #fafafa;
+/* TABLE STYLE */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+th {
+    background: #ddd;
+    padding: 8px;
+    text-align: left;
+    border-bottom: 2px solid #aaa;
+}
+
+td {
+    padding: 8px;
+    border-bottom: 1px solid #ccc;
+}
+
+tr:hover {
+    background: #f5f5f5;
 }
 
 .small {
-    font-size: 12px;
+    font-size: 11px;
     color: #666;
+}
+
+.nav {
+    margin-bottom: 10px;
 }
 </style>
 `;
@@ -109,11 +131,13 @@ ${style}
 </head>
 <body>
 
+<div class="topbar">OpenShare Index</div>
+
 <div class="container">
 
-<h2>OpenShare</h2>
-
-<p><a href="/login">Admin Login</a></p>
+<div class="nav">
+<a href="/login">Admin Login</a>
+</div>
 
 <form id="uploadForm">
 Title: <input name="title" required />
@@ -123,7 +147,15 @@ Title: <input name="title" required />
 
 <hr>
 
-<div id="list"></div>
+<table>
+<tr>
+<th>Name</th>
+<th>Action</th>
+<th>Time</th>
+</tr>
+
+<tbody id="list"></tbody>
+</table>
 
 </div>
 
@@ -134,10 +166,11 @@ async function load() {
 
     document.getElementById('list').innerHTML =
         data.map(f => \`
-            <div class="card">
-                <a href="\${f.url}" target="_blank">\${f.title}</a><br>
-                <span class="small">\${f.time || ""}</span>
-            </div>
+            <tr>
+                <td>\${f.title}</td>
+                <td><a href="\${f.url}" target="_blank">Download</a></td>
+                <td class="small">\${f.time || ""}</td>
+            </tr>
         \`).join('');
 }
 
@@ -173,9 +206,9 @@ ${style}
 </head>
 <body>
 
-<div class="container">
+<div class="topbar">Admin Login</div>
 
-<h2>Admin Login</h2>
+<div class="container">
 
 <form method="POST" action="/login">
 <input name="user" placeholder="username" required><br>
@@ -220,22 +253,29 @@ ${style}
 </head>
 <body>
 
+<div class="topbar">Admin Panel</div>
+
 <div class="container">
 
-<h2>Admin Panel</h2>
-
-<p>
+<div class="nav">
 <button onclick="load()">Refresh</button>
 <button onclick="deleteAll()">Delete All</button>
 <a href="/logout">Logout</a>
-</p>
+</div>
 
-<input id="search" placeholder="Search..." onkeyup="load()">
+<input id="search" placeholder="Search files..." onkeyup="load()">
 
 <div id="stats"></div>
-<hr>
 
-<div id="adminList"></div>
+<table>
+<tr>
+<th>Name</th>
+<th>Link</th>
+<th>Action</th>
+</tr>
+
+<tbody id="adminList"></tbody>
+</table>
 
 </div>
 
@@ -256,12 +296,11 @@ async function load() {
 
     document.getElementById('adminList').innerHTML =
         filtered.map((f,i) => \`
-            <div class="card">
-                <b>\${f.title}</b><br>
-                <a href="\${f.url}" target="_blank">Open</a><br>
-                <span class="small">\${f.time || ""}</span><br>
-                <button onclick="del(\${i})">Delete</button>
-            </div>
+            <tr>
+                <td>\${f.title}</td>
+                <td><a href="\${f.url}" target="_blank">Open</a></td>
+                <td><button onclick="del(\${i})">Delete</button></td>
+            </tr>
         \`).join('');
 }
 
@@ -304,7 +343,7 @@ app.post('/upload', upload.single('file'), (req, res) => {
     res.sendStatus(200);
 });
 
-// ================= FILE LIST =================
+// ================= FILES =================
 app.get('/files', (req, res) => {
     res.json(files);
 });
